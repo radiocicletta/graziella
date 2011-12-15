@@ -1,0 +1,15 @@
+#!/bin/bash
+
+function trapped() {
+   zenity --info --text TRAP
+}
+
+killall -9 idjc idjcctrl idjcmixer idjcsourceclient &> /dev/null
+
+trap trapped SIGTERM
+trap trapped SIGINT
+#export GTK2_RC_FILES=/usr/share/themes/Nodoka-Gilouche/gtk-2.0/gtkrc
+exec /usr/bin/idjc
+
+killall -15 idjc idjcctrl idjcmixer idjcsourceclient &> /dev/null
+

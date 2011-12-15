@@ -1,0 +1,44 @@
+#!/bin/bash
+#
+# La partenza
+#
+# perche' partire e' un po' morire.
+
+function run_if_not_started {
+   proc=`echo '$1' | sed 's!.*/\(.*\)!\1!'`
+   `ps U radiocicletta c -o pid,command,stat --no-heading | egrep '$proc *[SsLl]*'` &> /dev/null
+   if [ $? -eq 1 ]; then
+      $@ &
+   fi
+}
+
+maudio=$( grep M1010 /proc/asound/cards | sed  -e "s/\([ 0-9]\+\).*/\1/" )
+echo /usr/bin/jackd -P 80 -R -t1000 -m -dalsa -r48000 -p128 -n2 -D -Chw:${maudio# } -Phw:${maudio# } > .jackdrc
+echo JACK device checked
+
+#export GTK2_RC_FILES=/usr/share/themes/Nodoka-Gilouche/gtk-2.0/gtkrc
+
+./dropbox.py start
+
+run_if_not_started ./automatico.py
+#sleep 1
+#run_if_not_started /usr/bin/lv2rack chain.lv2rack
+sleep 1
+run_if_not_started ./Scriptcicletti/MusicCatalog/catalog.py -d /media/archivio/netlabels
+sleep 1
+run_if_not_started /usr/bin/jackd -P 80 -R -t1000 -m -dalsa -r48000 -p128 -n2 -D -Chw:${maudio# } -Phw:${maudio# } 
+#run_if_not_started /usr/bin/qjackctl --start 
+sleep 1
+#run_if_not_started /usr/bin/envy24control 
+run_if_not_started /usr/bin/mudita24
+sleep 1
+#run_if_not_started /usr/bin/jack-rack -s dsp compressor 
+#sleep 1
+#/usr/bin/pulseaudio -k
+#/usr/bin/pulseaudio -DnF ~/.pulse/pulsejack.pa
+
+#jack_connect system:capture_1 lv2rack:left;
+#jack_connect system:capture_2 lv2rack:right;
+
+run_if_not_started ./idjc_safe 
+
