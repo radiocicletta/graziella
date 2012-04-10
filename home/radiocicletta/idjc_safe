@@ -1,15 +1,22 @@
 #!/bin/bash
 
+function clean() {
+   killall -15 idjc idjcctrl idjcmixer idjcsourceclient &> /dev/null
+   echo -e "extdir=/home/radiocicletta\ndigiprogress_type=1\nstream_button=1\nlisten_button=1\nplaylist_mode=0\nplsave_filetype=0\nplsave_open=0\nfade_mode=0" > $HOME/.idjc/profiles/default/left_session
+   echo -e "extdir=/home/radiocicletta\ndigiprogress_type=1\nstream_button=1\nlisten_button=1\nplaylist_mode=0\nplsave_filetype=0\nplsave_open=0\nfade_mode=0" > $HOME/.idjc/profiles/default/right_session
+}
+
 function trapped() {
-   zenity --info --text TRAP
+   zenity --warning --text "<b>IDJC e' stato chiuso per cause purtroppo\nconosciute. Riavvialo usando i tasti Windows+P</b>"
+   clean
+   exit 0
 }
 
 killall -9 idjc idjcctrl idjcmixer idjcsourceclient &> /dev/null
 
-trap trapped SIGTERM
-trap trapped SIGINT
+trap trapped ERR
+
 #export GTK2_RC_FILES=/usr/share/themes/Nodoka-Gilouche/gtk-2.0/gtkrc
-exec /usr/bin/idjc
+/usr/bin/idjc
 
-killall -15 idjc idjcctrl idjcmixer idjcsourceclient &> /dev/null
-
+clean
