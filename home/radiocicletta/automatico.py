@@ -12,12 +12,15 @@ import re
 from pyinotify import WatchManager, Notifier, ThreadedNotifier, EventsCodes, ProcessEvent, IN_CREATE, IN_MOVED_TO, IN_CLOSE_WRITE, IN_DELETE
 from threading import Thread, Condition
 from time import sleep
+import logging
 
 AUTODIR = "/media/archivio/automatico"
 AUTOSHAREDIR = "/media/archivio/.dropbox/automatici"
 timedict = {}
 lock = Condition()
 pattern = re.compile("^[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}.*")
+
+logging.basicConfig(filename="/tmp/auto.log", level=logging.DEBUG, format="%(asctime)s %(threadName)s (%(thread)d) %(levelname)s %(message)s")
 
 class Dropboxer(ProcessEvent):
    def process_IN_MOVED_TO(self, event):
@@ -30,14 +33,13 @@ class Dropboxer(ProcessEvent):
       if pattern.match(event.name):
          lock.acquire()
          try:
-            print "moving %s" % event.name
+            logging.info("moving %s" % event.name)
             shutil.move("%s/%s" % (event.path, event.name), AUTODIR)
             if datetime.datetime.strptime(event.name[:16], "%Y-%m-%d_%H-%M") >= datetime.datetime.now():
                timedict[event.name[:16]] = "%s/%s" % (AUTODIR, event.name)
-            print "New:", timedict
+            logging.info("Insert: %s/%s" %s (AUTODIR, event.name))
          except Exception, e:
-            print e
-            #pass
+            logging.error(e)
          finally:
             lock.release()
 
@@ -47,7 +49,7 @@ class Autodir(ProcessEvent):
    def process_IN_DELETE(self, event):
       if pattern.match(event.name):
          if timedict.has_key(event.name[:16]):
-            print "delete", event.name
+            logging.info("delete %s" % event.name)
             lock.acquire()
             del timedict[event.name[:16]]
             lock.release()
@@ -55,7 +57,7 @@ class Autodir(ProcessEvent):
    def process_IN_CLOSE_WRITE(self, event):
       if pattern.match(event.name):
          if not timedict.has_key(event.name[:16]):
-            print "add", event.name
+            logging.info("add %s" % event.name)
             lock.acquire()
             if datetime.datetime.strptime(event.name[:16], "%Y-%m-%d_%H-%M") >= datetime.datetime.now():
                timedict[event.name[:16]] = "%s/%s" % (AUTODIR, event.name)
@@ -79,17 +81,18 @@ class Pusher(Thread):
          lock.acquire()
          try:
             i = self.date.strftime("%Y-%m-%d_%H-%M")
-            print "Tick", i, timedict
+            logging.debug("-- MARK %s --" % i)
+            logging.debug("current queue: %s" % timedict)
             if timedict.has_key(i):
                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                sock.connect((self.remote, 1234))
                sock.send("request.push %s\n" % timedict[i])
-               print sock.recv(1024)
+               logging.debug("request.push %s" % timedict[i])
+               logging.debug(sock.recv(1024))
                sock.close()
                del timedict[i]
          except Exception, e:
-            print e
-            #pass
+            logging.error(e)
          finally:
             lock.release()
 
@@ -138,8 +141,11 @@ def main():
    # 2. carica la lista di esecuzione automatica
    now = datetime.datetime.now()
    for i in os.listdir(AUTODIR):
-      if pattern.match(i) and datetime.datetime.strptime(i[:16], "%Y-%m-%d_%H-%M") >= now:
-         timedict[i[:16]] = "%s/%s" % (AUTODIR, i)
+      try:
+         if pattern.match(i) and datetime.datetime.strptime(i[:16], "%Y-%m-%d_%H-%M") >= now:
+            timedict[i[:16]] = "%s/%s" % (AUTODIR, i)
+      except Exception, e:
+         logging.error(e)
 
    # 3. crea e avvia il thread Pusher
    pusher = Pusher("localhost")
