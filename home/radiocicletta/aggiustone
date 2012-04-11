@@ -1,0 +1,56 @@
+#!/bin/bash
+# L'Aggiustone!
+#
+# questo script automatizza processi altrimenti noiosi esercitati dai tecnici:
+# 
+#    * rigenera le playlist musicali free
+#    * elimina file non voluti dalle cartelle musicali (pdf, jpg, txt, schifi e schife)
+#    * converte file flac da 24 a 16 bit e da 48000 a 44100
+#    * cosucce varie da aggiungere poi
+#
+# il tutto ad orari improponibili per esseri umani
+
+MEDIA=/media/archivio
+FREELISTS="lastfm netlabels jingles"
+LISTS="catalogati catalogare trasmissioni"
+TODO=catalogare
+ARCHIVE=$MEDIA/registrazioni
+PLAYLISTS=$MEDIA/playlists
+TALKLOG=/home/radiocicletta
+
+
+for i in $FREELISTS; do
+   /usr/bin/fapg -r -f m3u $MEDIA/$i/ > $PLAYLISTS/$i.m3u
+   /usr/bin/find $MEDIA/$i -type f -iregex ".*\.\(jp[e]*g\|m4v\|mov\|avi\|png\|pdf\|bmp\|txt\|dll\|ini\|db\|DS_Store\|_.*\)$" \! -iregex ".*\(licen\|commons\).*" -delete
+done
+
+for i in $LISTS; do
+   /usr/bin/find $MEDIA/$i -type f -iregex ".*\.\(jp[e]*g\|mov\|avi\|png\|pdf\|bmp\|txt\|dll\|ini\|DS_Store\|_.*\)$"  -delete
+done
+
+
+/bin/mv $HOME/*.{flac,cue} $MEDIA/*.{flac,cue} $ARCHIVE
+/bin/mv $MEDIA/*.{mp3,wma,aac,mp4,ogg} $MEDIA/$TODO
+/usr/bin/find $MEDIA \! -path "$ARCHIVE/*" -iname 'idjc*flac' -exec mv {} $ARCHIVE/ \;
+/usr/bin/find $MEDIA \! -path "$ARCHIVE/*" -iname 'idjc*cue' -exec mv {} $ARCHIVE/ \;
+/bin/rm -rf $HOME/Desktop/*
+
+#silence 1 0.1 0% -3 0.5 0% 
+for i in $ARCHIVE/*flac ; do 
+   sox --temp $MEDIA/.tmp $i --norm -r 44100 -b 16  ${i/flac}44100.flac && \
+   /home/radiocicletta/podcaster.py ${i/flac}44100.flac $TALKLOG/talk.log $ARCHIVE/podcast && \
+   mv ${i/flac}44100.flac ${i/flac}cue $ARCHIVE/complete && rm $i
+done
+
+/home/radiocicletta/ppublish.py $ARCHIVE/podcast
+
+
+#TODO: move away
+curl http://localhost:8080/aggregate/genre/ambient,folk,soul,blues,acoustic,easy,instrumental > $PLAYLISTS/dawn.m3u
+curl http://localhost:8080/aggregate/genre/pop,rock,indie,reggae,ska,soul,blues,acoustic,funk,hip-hop,easy,mashup > $PLAYLISTS/morning.m3u
+curl http://localhost:8080/aggregate/genre/pop,rock,folk,reggae,ska,soul,blues,funk,hip-hop,easy,mashup,downtempo,chill,trip-hop,big%20beat,singer-songwriter > $PLAYLISTS/noon.m3u
+curl http://localhost:8080/aggregate/genre/pop,electropop,indietronica,punk,rock,folk,reggae,ska,soul,blues,acoustic,funk,hip-hop,easy,italia,grunge,mashup,post-rock,drum%20\&%20bass,trip-hop,big%20beat,singer-songwriter,dubstep > $PLAYLISTS/afternoon.m3u
+curl http://localhost:8080/aggregate/genre/rock,soul,blues > $PLAYLISTS/dusk.m3u
+curl http://localhost:8080/aggregate/genre/dreampop,jazz,rock,folk,soul,blues,acoustic,funk,easy,piano,shoegaze,indie,downtempo,downbeat,trip-hop,chillout > $PLAYLISTS/night.m3u
+
+echo -e "dawn(dot)m3u.reload\nmorning(dot)m3u.reload\nnoon(dot)m3u.reload\nafternoon(dot)m3u.reload\ndusk(dot)m3u.reload\nnight(dot)m3u.reload\nquit\n" | nc -t localhost 1234
